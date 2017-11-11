@@ -1,1 +1,1 @@
-# My project's README
+# AAU projects, exercises and stuff
