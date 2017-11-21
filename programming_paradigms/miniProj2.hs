@@ -1,5 +1,7 @@
 -- Programming Paradigms 2nd miniproject - a Haskell package for univariate expressions
 
+import Data.Char
+import Parse
 
 -- types for X (main variable), C (a constant), K (a power)
 type X = String
@@ -16,9 +18,36 @@ data P = Var X | Times C P | Plus P P | Power X K deriving (Eq, Show)
 -- or cosine of an expression
 data E = Pol P | Add E E | Mult E E | Divide E E | Der E | Sin E | Cos E deriving (Eq, Show)
 
---data FinalExp = Exp E
+-- function that converts an expression formatted as a string into an expression with the Exp data type
+-- uses the lexer and the parser generated with Happy
+run :: String -> Exp
+run = parser . lexer
 
---data Either a b = E a | FinalExp b
+
+-- function that converts an expression from the intermediary Exp type to the final E type
+convertExp :: Exp -> E
+convertExp (PlusE e1 e2) = (Add (convertExp e1) (convertExp e2))
+convertExp (MinusE e1 e2) = (Add (convertExp e1) (Mult (numConst (-1) "x") (convertExp e2)))
+convertExp (SinE e) = (Sin (convertExp e))
+convertExp (CosE e) = (Cos (convertExp e))
+convertExp (DerE e) = (Der (convertExp e))
+convertExp (Term t) = convertTerm t
+
+convertTerm :: Term -> E
+convertTerm (TimesE t1 t2) = (Mult (convertTerm t1) (convertTerm t2))
+convertTerm (DivE t1 t2) = (Divide (convertTerm t1) (convertTerm t2))
+convertTerm (Factor f) = convertFactor f
+
+convertFactor :: Factor -> E
+convertFactor (Int i) = (numConst (fromIntegral i) "x")
+convertFactor (VarE str) = (Pol (Var str))
+convertFactor (Brack e) = convertExp e
+convertFactor (PowerE e i) = (powerToMult (convertExp e) (i - 1) (convertExp e))
+
+powerToMult e 0 res = res
+powerToMult e n res = powerToMult e (n - 1) (Mult e res)
+
+
 
 -- helper functions for building various expressions, such as x^k, sin x, sin^2 x etc.
 powerOf a b = (Pol (Power a b))
@@ -46,15 +75,9 @@ t5 = numConst 7 "x"
 t6 = Divide (Mult (Mult (numConst 1 "x") (Add (sin2 "x") (cos2 "x"))) (powerOf "x" 3)) (powerOf "x" 2)
 t7 = (Der (Pol (Power "x" 2)))
 t8 = (Der (Add (powerOf "x" 4) (Der (cosine "x"))))
--- functions for evaluating an expression, uses pattern matching to cover different cases
 
---eval :: E -> Either Exp FinalExp
-
-reduce e = reduceHelper e (eval e)
-reduceHelper e next
-    | e == next     =   e
-    | otherwise     =   reduceHelper e (eval e)
     
+-- functions for evaluating an expression, uses pattern matching to cover different cases    
 eval :: E -> E    
 eval (Add e1 e2) = addE (eval e1) (eval e2)
 eval (Mult e1 e2) =  multE (eval e1) (eval e2)
@@ -106,3 +129,10 @@ derE (Add e1 e2) = (Add (derE e1) (derE e2))
 derE (Mult e1 e2) = (Add (Mult e1 (derE e2)) (Mult (derE e1) e2))
 derE (Divide (Pol (Power "x" 0)) e) = (Divide (Mult (numConst (-1) "x") (derE e)) (Mult e e))
 derE (Divide e1 e2) = (Divide (Add (Mult (derE e1) e2) (Mult (numConst (-1) "x") (Mult (derE e2) e1))) (Mult e2 e2))
+
+
+--test = (convertExp (run "(sin x) * (sin x) + (cos x) * (cos x)"))
+
+main = do putStrLn "Input expression: "
+          exp <- getLine
+          print (eval (convertExp (run (exp))))

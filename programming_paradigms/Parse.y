@@ -19,31 +19,31 @@ import Data.Char
 	'sin' { SinToken }
 	'cos' { CosToken }
 	'd/dx' {DeriveToken}
-%%      
+%%
 
 Exp :: { Exp }
-Exp : E1	{ E1 $1 }
-E1 : Factor { Factor $1 }	
-	| E1 '+' E1 { PlusE $1 $3 } 
-	| E1 '-' E1 { MinusE $1 $3 }
-	| E1 '*' E1 { TimesE $1 $3 } 
-	| E1 '/' E1 { DivE $1 $3 }
-	| 'sin' E1 { SinE $2 } 
-	| 'cos' E1 { CosE $2 }
-	| 'd/dx' E1 { DerE $2 }
-	| E1 '^' E1 { PowerE $1 $3}
-Factor : int			{ Int $1 }
-	| str			{ Varr $1 }
-	| '(' Exp ')'		{ Brack $2 }
+Exp : Exp '+' Exp { PlusE $1 $3 }
+	| Exp '-' Exp { MinusE $1 $3 }
+	| 'sin' Exp { SinE $2 }
+	| 'cos' Exp { CosE $2 }
+	| 'd/dx' Exp { DerE $2 }
+	| Term { Term $1 }
+Term : Term '*' Term { TimesE $1 $3 }
+	| Term '/' Term { DivE $1 $3 }
+	| Factor { Factor $1 }
+Factor : int { Int $1 }
+	| str { VarE $1 }
+	| '(' Exp ')' { Brack $2 }
+	| Exp '^' int { PowerE $1 $3}
 
 {
-
+	
 happyError :: [Token] -> a
 happyError _ = error ("Parse error\n")
 
-data Exp  = E1 E1 deriving (Eq, Show, Ord)
-data E1 = PlusE E1 E1 | MinusE E1 E1 | TimesE E1 E1 | DivE E1 E1 | SinE E1 | CosE E1 | DerE E1 | PowerE E1 E1 | Factor Factor deriving (Eq, Show, Ord)
-data Factor = Int Int | Varr String | Brack Exp deriving (Eq, Show, Ord)
+data Exp = PlusE Exp Exp | MinusE Exp Exp | SinE Exp | CosE Exp | DerE Exp | Term Term deriving (Eq, Show, Ord)
+data Term = TimesE Term Term | DivE Term Term| Factor Factor deriving (Eq, Show, Ord)
+data Factor = Int Int | VarE String | Brack Exp | PowerE Exp Int deriving (Eq, Show, Ord)
 
 data Token = PlusToken | MinusToken | TimesToken | DivideToken | PowerToken | DeriveToken | SinToken |
     CosToken | OpenToken | CloseToken | IntToken Int | VarToken String deriving (Eq, Show, Ord)
