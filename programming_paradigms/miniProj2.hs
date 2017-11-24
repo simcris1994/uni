@@ -1,12 +1,13 @@
 -- Programming Paradigms 2nd miniproject - a Haskell package for univariate expressions
 
 import Data.Char
+import System.IO
 import Parse
 
 -- types for X (main variable), C (a constant), K (a power)
 type X = String
 type C = Double
-type K = Integer
+type K = Int
 
 -- data type for a polynomial - can be a variable, a polynomial multiplied with a constant,
 -- two polynomials added, a variable raised to a power k
@@ -17,11 +18,6 @@ data P = Var X | Times C P | Plus P P | Power X K deriving (Eq, Show)
 -- the derivative of a function (expression) with respect to a variable, or the sine
 -- or cosine of an expression
 data E = Pol P | Add E E | Mult E E | Divide E E | Der E | Sin E | Cos E deriving (Eq, Show)
-
--- function that converts an expression formatted as a string into an expression with the Exp data type
--- uses the lexer and the parser generated with Happy
-run :: String -> Exp
-run = parser . lexer
 
 
 -- function that converts an expression from the intermediary Exp type to the final E type
@@ -42,11 +38,11 @@ convertFactor :: Factor -> E
 convertFactor (Int i) = (numConst (fromIntegral i) "x")
 convertFactor (VarE str) = (Pol (Var str))
 convertFactor (Brack e) = convertExp e
+convertFactor (PowerE (Term (Factor (VarE x))) i) = powerOf x i
 convertFactor (PowerE e i) = (powerToMult (convertExp e) (i - 1) (convertExp e))
 
 powerToMult e 0 res = res
 powerToMult e n res = powerToMult e (n - 1) (Mult e res)
-
 
 
 -- helper functions for building various expressions, such as x^k, sin x, sin^2 x etc.
@@ -57,26 +53,7 @@ sin2 a = (Mult (sine a) (sine a))
 cos2 a = (Mult (cosine a) (cosine a))
 numConst a x = (Pol (Times a (Power x 0)))
 
--- examples to test on
-ex1 = Mult (powerOf "x" 2) (powerOf "x" 3)
-ex2 = Divide (powerOf "x" 6) (powerOf "x" 3)
-ex3 = Add (sin2 "x") (cos2 "x")
-ex4 = Mult (Pol (Var "x")) (Pol (Var "x"))
-ex5 = Add (Add (powerOf "x" 7) (powerOf "x" 3)) (numConst 7 "x")
-ex6 = Mult (Mult (powerOf "x" 2) (powerOf "x" 4)) (powerOf "x" 3)
-ex7 = Mult (numConst 7 "x") (Add (powerOf "x" 5) (powerOf "x" 3))
-ex8 = Mult (powerOf "x" 5) (numConst 1 "x")
-
-t1 = Add (numConst 5 "x") (numConst 3 "x")
-t2 = Mult (numConst 7 "x") (numConst 8 "x")
-t3 = Divide (numConst 50 "x") (numConst 5 "x")
-t4 = 0
-t5 = numConst 7 "x"
-t6 = Divide (Mult (Mult (numConst 1 "x") (Add (sin2 "x") (cos2 "x"))) (powerOf "x" 3)) (powerOf "x" 2)
-t7 = (Der (Pol (Power "x" 2)))
-t8 = (Der (Add (powerOf "x" 4) (Der (cosine "x"))))
-
-    
+   
 -- functions for evaluating an expression, uses pattern matching to cover different cases    
 eval :: E -> E    
 eval (Add e1 e2) = addE (eval e1) (eval e2)
@@ -87,12 +64,11 @@ eval (Sin e) = Sin (eval e)
 eval (Cos e) = Cos (eval e)
 eval (Pol p) = Pol p
 
+
 addE (Pol (Times a (Power b 0))) (Pol (Times c (Power d 0))) = numConst (a + c) "x"
 addE (Mult (Sin (Pol (Var a))) (Sin (Pol (Var b)))) (Mult (Cos (Pol (Var x))) (Cos (Pol (Var y))))
     | a == b && x == y && a == y    =   numConst 1 x
     | otherwise                     =  (Add (Mult (Sin (Pol (Var a))) (Sin (Pol (Var b)))) (Mult (Cos (Pol (Var x))) (Cos (Pol (Var y)))))
---addE (Add x y) z = (Add x (Add y z))
---addE e1 e2 = (Add e1 e2)
 addE e1 e2
     | e1 == e2  =   (Mult (Pol (Var "2")) e1)
     | otherwise =   (Add e1 e2)
@@ -106,10 +82,8 @@ multE (Pol (Var x)) (Pol (Var y))
     | otherwise =   (Mult (Pol (Var x)) (Pol (Var y)))
 multE a (Pol (Times 1.0 (Power x 0))) = a
 multE (Pol (Times 1.0 (Power x 0))) a = a
---multE (Mult x y) z = (Mult x (Mult y z))
 multE a (Add b c) = (Add (Mult a b) (Mult a c))
 multE e1 e2 = (Mult e1 e2)
---multE e1 e2 = (Mult e2 e1)
 
 divideE (Pol (Times a (Power b 0))) (Pol (Times c (Power d 0))) = numConst (a / c) "x"
 divideE (Pol (Power x ex1)) (Pol (Power y ex2))
@@ -130,9 +104,58 @@ derE (Mult e1 e2) = (Add (Mult e1 (derE e2)) (Mult (derE e1) e2))
 derE (Divide (Pol (Power "x" 0)) e) = (Divide (Mult (numConst (-1) "x") (derE e)) (Mult e e))
 derE (Divide e1 e2) = (Divide (Add (Mult (derE e1) e2) (Mult (numConst (-1) "x") (Mult (derE e2) e1))) (Mult e2 e2))
 
+-- converting from type E to string so it can be printed to .tex
+eToString (Add e1 ((Mult ((Pol (Times (-1.0) (Power "x" 0)))) e2))) = "(" ++ (eToString e1) ++ " - " ++ (eToString e2) ++ ")"
+eToString (Add e1 e2) = "(" ++ (eToString e1) ++ " + " ++ (eToString e2) ++ ")"
+eToString (Mult e1 e2) = "(" ++ (eToString e1) ++ " * " ++ (eToString e2) ++ ")"
+eToString (Divide e1 e2) = "\\frac{" ++ (eToString e1) ++ "}{" ++ (eToString e2) ++ "}"
+eToString (Der e) = "\\frac{d}{dx} " ++ (eToString e)
+eToString (Sin e) = "sin(" ++ (eToString e) ++ ")"
+eToString (Cos e) = "cos(" ++ (eToString e) ++ ")"
+eToString (Pol p) = pToString p
 
---test = (convertExp (run "(sin x) * (sin x) + (cos x) * (cos x)"))
+pToString (Var x) = x
+pToString (Times c (Power x 0)) = show (floor c)
+pToString (Times c p)
+    | c == 1.0 = (pToString p)
+    | otherwise = (show (floor c)) ++ " * " ++ (pToString p)
+pToString (Plus p1 p2) = (pToString p1) ++ " + " ++ (pToString p2)
+pToString (Power x k)
+    | k == 1 = x
+    | k == 0 = "1"
+    | otherwise = x ++ "^" ++ (show k)
+--
 
-main = do putStrLn "Input expression: "
-          exp <- getLine
-          print (eval (convertExp (run (exp))))
+--reduce
+reduce e = reverse $ reduceSeq e [e]
+
+reduceSeq :: E -> [E] -> [E]
+reduceSeq e ls@(h:_) 
+    | h == currentReduction = ls
+    | otherwise = reduceSeq currentReduction (currentReduction : ls)
+    where currentReduction = eval e
+--
+          
+read' :: IO String
+read' = putStr "Input expression:> "
+     >> hFlush stdout
+     >> getLine
+
+parseAndEval :: String -> E
+parseAndEval = eval . convertExp . parser . lexer
+
+parseEvalAndWrite :: String -> IO()
+parseEvalAndWrite = writeToFile . getEquations . reduce . convertExp . parser . lexer
+
+
+getEquations [] = ""
+getEquations [x] = "\\begin{equation}\n" ++ (eToString x) ++ "\n\\end{equation}\n"
+getEquations (x:xs) = "\\begin{equation}\n" ++ (eToString x) ++ " =\n\\end{equation}\n" ++ getEquations xs
+
+writeToFile eqs = writeFile "test.tex" ("\\documentclass[12pt]{article}\n\\usepackage{amsmath}\n\\begin{document}\n" ++ eqs ++ "\n\\end{document}")
+  
+                 
+main = do
+    input <- read'
+    print (parseAndEval input)
+    parseEvalAndWrite input    
