@@ -19,11 +19,22 @@ operates(airline, leg)
 countryOfAirport(cph, denmark).
 countryOfAirport(lax, usa).
 passport(jane, sweden).
+passport(mike, usa).
+reservedBy(abc123, jane).
+reservedBy(abd124, jane).
+reservedBy(bbb123, mike).
+reservationDestination(abc123, cph).
+reservationDestination(abd124, lax).
+reservationDestination(bbb123, cph).
 visaAgreement(sweden, denmark).
 
 
-canFly(Passenger, Airport) :- passport(Passenger, Country),
+canFlyInto(Passenger, Airport) :- passport(Passenger, Country),
 	countryOfAirport(Airport, Country).
-canFly(Passenger, Airport) :- visaAgreement(PassengerCountry, AirportCountry),
+canFlyInto(Passenger, Airport) :- visaAgreement(PassengerCountry, AirportCountry),
 	passport(Passenger, PassengerCountry),
 	countryOfAirport(Airport, AirportCountry).
+
+illegalReservation(Passenger, Reservation) :- reservedBy(Reservation, Passenger),
+	reservationDestination(Reservation, Airport),
+	not(canFlyInto(Passenger, Airport)).
