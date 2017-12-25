@@ -23,15 +23,24 @@ passport('Jack Doe', 'USA').
 airport('LAX', 'Los Angeles', 'USA', 'clear').
 airport('JFK', 'New York City', 'USA', 'clear').
 airport('BLL', 'Billund', 'Denmark', 'clear').
+airport('CPH', 'Copenhagen', 'Denmark', 'clear').
 airport('AMS', 'Amsterdam', 'The Netherlands', 'windy').
 visaAgreement('USA', 'Denmark').
 reservation('XYZ123', 'Jane Doe', 'LAX', 'BLL', 'SAS', '12A').
 reservation('XXY122', 'Jack Doe', 'JFK', 'AMS', 'KLM', '30F').
 reservation('ABC123', 'Jack Doe', 'LAX', 'BLL', 'SAS', '12A').
+reservation('XYZ124', 'Jane Doe', 'LAX', 'CPH', 'SAS', '15A').
 leg('LAX', 'BLL', 'SAS', 'SAS', 'BX987').
+leg('LAX', 'CPH', 'SAS', 'SAS', 'BX988').
 leg('JFK', 'AMS', 'KLM', 'KLM', 'AX678').
 aircraft('BX987', 'Airbus A380', 'Airbus', 'light').
+aircraft('BX988', 'Airbus A380', 'Airbus', 'light').
 aircraft('AX678', 'Boeing 737', 'Boeing', 'light').
+aircraftWeather('light', 'clear').
+aircraftWeather('light', 'cloudy').
+aircraftWeather('heavy', 'clear').
+aircraftWeather('heavy', 'cloudy').
+aircraftWeather('heavy', 'windy').
 
 agreement(Country1, Country2) :- visaAgreement(Country1, Country2);
 	visaAgreement(Country2, Country1).
@@ -70,7 +79,16 @@ countDoubleBookingsOnAircraft(Aircraft, No) :-
     length(Bookings, No).
 passengersOnAircraft(Aircraft, Passengers) :- findall(X, (passenger(X, _), reservation(_, X, Origin, Destination, _, _), leg(Origin, Destination, _, _, Aircraft)), Passengers).
 passengersWhoCantTravelOnAircraft(Aircraft, Passengers) :- findall(X, (passenger(X, _), reservation(_, X, Origin, Destination, _, _), leg(Origin, Destination, _, _, Aircraft), not(mayFlyInto(X, Destination))), Passengers).
-/**doubleBookingOnAircraft(Aircraft) :- aircraft(Aircraft, _, _, _),
-	leg(Origin, Destination, ServiceAirline, OperatorAirline, Aircraft),*/
+countPassengersWhoCantTravelOnAircraft(Aircraft, No) :-
+	findall(X, (passenger(X, _), reservation(_, X, Origin, Destination, _, _), leg(Origin, Destination, _, _, Aircraft), not(mayFlyInto(X, Destination))), Passengers),
+	length(Passengers, No).
+isWeatherSuitableForAircraft(Aircraft) :- aircraft(Aircraft, _, _, Type),
+	leg(Origin, Destination, _, _, Aircraft),
+	aircraftWeather(Type, Weather),
+	airport(Origin, _, _, Weather),
+	airport(Destination, _, _, Weather). 
+mayTakeOff(Aircraft) :- countDoubleBookingsOnAircraft(Aircraft, 0),
+	countPassengersWhoCantTravelOnAircraft(Aircraft, 0),
+	isWeatherSuitableForAircraft(Aircraft).
 	
 	
