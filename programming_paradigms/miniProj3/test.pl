@@ -87,8 +87,42 @@ isWeatherSuitableForAircraft(Aircraft) :- aircraft(Aircraft, _, _, Type),
 	aircraftWeather(Type, Weather),
 	airport(Origin, _, _, Weather),
 	airport(Destination, _, _, Weather). 
-mayTakeOff(Aircraft) :- countDoubleBookingsOnAircraft(Aircraft, 0),
+mayTakeOff(Aircraft) :- aircraft(Aircraft, _, _, _),
+	countDoubleBookingsOnAircraft(Aircraft, 0),
 	countPassengersWhoCantTravelOnAircraft(Aircraft, 0),
 	isWeatherSuitableForAircraft(Aircraft).
+%
 	
+% problem 7
+connected(A, B) :- leg(A, B, _, _, _),
+	airport(A, _, _, _),
+	airport(B, _, _, _).
+connected(A, B) :- leg(A, X, _, _, _),
+	connected(X, B),
+	airport(A, _, _, _),
+	airport(B, _, _, _),
+	airport(X, _, _, _).
+	
+path(A, B, [A, B]) :-
+    leg(A, B, _, _, _),
+    airport(A, _, _, _),
+		airport(B, _, _, _).
+path(A, B, PathAB) :-
+    leg(A, C, _, _, _),
+    path(C, B, PathCB),
+    airport(A, _, _, _),
+		airport(B, _, _, _),
+		airport(C, _, _, _),
+    PathAB = [A | PathCB].
+airportsPassengerMayNotVisit(Passenger, Airports) :- findall(X, (airport(X, _, _, _), not(mayFlyInto(Passenger, X))), Airports).
+airportsOnRoutePassengerMayNotVisit(Passenger, A, B, AirportList) :- 
+	path(A, B, Path),
+	airportsPassengerMayNotVisit(Passenger, Airports),
+	intersection(Path, Airports, AirportList).
+countAirportsCantVisit(Passenger, A, B, No) :-
+	airportsOnRoutePassengerMayNotVisit(Passenger, A, B, AirportList),
+	length(AirportList, No).
+
+canPassengerBook(Passenger, A, B) :- passenger(Passenger, _), connected(A, B), countAirportsCantVisit(Passenger, A, B, 0).	
+% TODO: reserved seat stuff
 	
